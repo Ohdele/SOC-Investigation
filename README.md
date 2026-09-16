@@ -126,9 +126,9 @@ Confirmed NTLM-based Administrator authentication from `192.168.56.115` to DC1, 
 
 ### Evidence
 
-![Case 02 — NTLM Session Lifecycle](Screenshot%202/case2-ntlm-session-lifecycle-evidence.png)
+![Case 02 — NTLM Session Lifecycle](Screenshot%202/ntlm-session-lifecycle.png)
 
-![Case 02 — NTLM Privileged Session](Screenshot%202/case2-ntlm-privileged-session-4672-evidence.png)
+![Case 02 — NTLM Privileged Session](Screenshot%202/ntlm-privileged-session-4672.png)
 
 ## Operational Impact
 Provides evidence-based analysis of NTLM privileged sessions while distinguishing confirmed authentication activity from unconfirmed lateral movement.
