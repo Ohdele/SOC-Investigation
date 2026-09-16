@@ -18,9 +18,17 @@ Repeated failures followed by success may indicate account compromise.
 - **Sources:** Wazuh, Windows Security Logs, Sysmon
 - **Indicators:** Event IDs 4625 (failures), 4624 (success), 1 (process)
 - **Queries:**
-  - 4625 failures
-  - 4624 successes for john.smith
-  - Sysmon Event ID 1
+
+```text
+Event ID 4625 — Failed logons
+data.win.system.eventID: 4625
+
+Event ID 4624 — Successful logons for john.smith
+data.win.system.eventID: 4624 AND data.win.eventdata.targetUserName: john.smith
+
+Sysmon Event ID 1 — Process creation
+data.win.system.eventID: 1
+```
 
 ### Investigation
 - 21 failed logons (DC1: 5, WS01: 16).
@@ -52,3 +60,77 @@ Monitor repeated failures and correlate future successful logons with endpoint a
 
 ## Operational Impact
 Shows evidence-based authentication investigation without misattributing system activity.
+
+---
+
+
+# Case Study 02 — AD Reconnaissance
+
+## Threat Name
+NTLM-based network authentication
+
+### Objective
+Investigate NTLM-based network authentication linked to the activity and determine if it progressed into additional activity on DC1.
+
+### MITRE ATT&CK
+- **Technique:** T1078 — Valid Accounts
+- **Tactic:** Credential Access
+
+### Hunt Hypothesis
+Remote NTLM authentication with Administrator may indicate unauthorized network access and could lead to further activity.
+
+### Detection Strategy
+- **Evidence Sources:** Wazuh, Windows Security Logs
+- **Suspicious Indicators:** NTLM Type 3 logons, source IP `192.168.56.115`, destination DC1, Administrator account, Logon ID `0x7b8e69`, Events 4624, 4634, 4672
+- **Queries:**
+
+```text
+Event ID 4624 — NTLM authentication from 192.168.56.115
+data.win.system.eventID: "4624" AND @timestamp >= "2026-09-01T15:25:21.363Z" AND @timestamp <= "2026-09-02T18:01:53.646Z" AND data.win.eventdata.ipAddress: "192.168.56.115"
+
+Session lifecycle — Logon ID 0x7b8e69
+data.win.eventdata.targetLogonId: "0x7b8e69" AND @timestamp >= "2026-09-01T15:25:21.363Z" AND @timestamp <= "2026-09-02T18:01:53.646Z"
+
+Event ID 4624 — Successful logons during session
+@timestamp >= "2026-09-02T18:01:53.646Z" AND @timestamp <= "2026-09-02T18:03:33.788Z" AND data.win.system.eventID: 4624
+
+Event ID 4672 — Special privileges during session
+@timestamp >= "2026-09-02T18:01:53.646Z" AND @timestamp <= "2026-09-02T18:03:33.788Z" AND data.win.system.eventID: 4672
+
+Event ID 4672 — Direct Logon ID correlation
+data.win.system.eventID: "4672" AND data.win.eventdata.subjectLogonId: "0x7b8e69"
+```
+
+### Investigation
+- Repeated NTLM Type 3 authentications from `192.168.56.115` to DC1, primarily using Administrator.
+- Session `0x7b8e69`: logon at **Sep 2, 2026 @ 18:01:53.646**, logoff at **18:03:33.788** (duration 1m 40.142s).
+- Event ID 4672 confirmed special privileges including SeDebug, SeBackup, SeRestore, and SeImpersonate.
+- No process creation (Event ID 1) or service creation (Event ID 7045) was observed during the session.
+
+### Findings & Summary
+Confirmed NTLM-based Administrator authentication from `192.168.56.115` to DC1, followed by a privileged session. Evidence shows authentication and privilege assignment, but no progression into process or service activity. Potential lateral-movement activity is indicated, but lateral movement is not confirmed.
+
+### Who, What, When, Where, Why, How
+- **Who:** `DELEDFIR\Administrator` from `192.168.56.115`
+- **What:** NTLM Type 3 network authentication and privileged session
+- **When:** **Sep 1, 2026 @ 15:25:21.363 → Sep 2, 2026 @ 18:03:33.788**; confirmed session **Sep 2, 2026 @ 18:01:53.646 → 18:03:33.788**
+- **Where:** Source `192.168.56.115` → DC1
+- **Why:** Not established from available evidence
+- **How:** NTLM authentication (4624), privilege assignment (4672), and logoff (4634)
+
+### Recommendations
+- Monitor NTLM authentication involving privileged accounts.
+- Correlate authenticated sessions with process and service telemetry.
+- Investigate privileged sessions from unexpected sources.
+- Improve endpoint visibility during NTLM sessions.
+
+### Evidence
+
+![Case 02 — NTLM Session Lifecycle](Screenshot%202/case2-ntlm-session-lifecycle-evidence.png)
+
+![Case 02 — NTLM Privileged Session](Screenshot%202/case2-ntlm-privileged-session-4672-evidence.png)
+
+## Operational Impact
+Provides evidence-based analysis of NTLM privileged sessions while distinguishing confirmed authentication activity from unconfirmed lateral movement.
+
+
