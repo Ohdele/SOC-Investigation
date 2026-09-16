@@ -133,4 +133,60 @@ Confirmed NTLM-based Administrator authentication from `192.168.56.115` to DC1, 
 ## Operational Impact
 Provides evidence-based analysis of NTLM privileged sessions while distinguishing confirmed authentication activity from unconfirmed lateral movement.
 
+---
 
+
+# Case Study 03 — JML Account Changes
+
+## Threat Name
+Joiner/Mover/Leaver (JML) account changes — enable/disable and group-membership activity
+
+## Objective
+
+Investigate account enable/disable and group-membership changes, distinguishing legitimate IAM activity from potential unauthorized manipulation.
+
+## MITRE ATT&CK
+Technique: T1098 — Account Manipulation  
+Tactic: Persistence
+
+## Hunt Hypothesis
+Unexpected account changes or privileged group modifications may indicate unauthorized manipulation.
+
+## Detection Strategy
+Evidence Sources: Wazuh, Windows Security Logs
+Suspicious Indicators: Account enable/disable (4722, 4725), group-membership changes (4728)
+
+Queries:
+    data.win.system.eventID: (4722 OR 4725)
+    data.win.system.eventID: "4728"
+
+## Investigation
+- 16 enable/disable events across DC1 and WS01 involving Guest, student1, and WazuhTest.
+- All changes were associated with the Administrators account.
+- 2 group-membership events (4728) on WS01; affected member not captured (`targetUserName=None`).
+
+## Findings & Summary
+Confirmed account enable/disable and group-membership changes. Activity documented as IAM events, not automatically malicious. Attribution is limited by missing member detail in the 4728 events.
+
+## Who, What, When, Where, Why, How
+Who: Guest, student1, WazuhTest, Administrators  
+What: Account enable/disable and group changes  
+When: Aug 27, 2026 @ 15:41:13.950 → Aug 29, 2026 @ 18:49:30.291  
+Where: DC1 and WS01  
+Why: Not established  
+How: Security Events 4722, 4725, and 4728 via Wazuh
+
+## Recommendations
+- Monitor sensitive account changes.
+- Correlate group modifications with admin activity and change records.
+- Improve telemetry to capture affected members in 4728 events.
+- Review unexpected privileged group changes.
+
+## Evidence
+
+![Case 03 — JML Account Enable/Disable Activity](Screenshot%203/jml-account-enable-disable.png)
+
+![Case 03 — JML Group Membership Changes](Screenshot%203/jml-group-membership.png)
+
+## Operational Impact
+Demonstrates detection of account lifecycle and group-membership changes while identifying a telemetry gap that limits attribution of affected members in Event 4728.
