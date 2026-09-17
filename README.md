@@ -195,74 +195,79 @@ Demonstrates detection of account lifecycle and group-membership changes while i
 
 # Case Study 04 — SSH Brute-Force Investigation
 
+### Threat Name
+SSH Brute-Force
+
 ### Objective
-Investigate repeated failed SSH authentication attempts to identify the source IP, targeted account, authentication-failure activity, brute-force detection threshold, and automated response.
+Investigate repeated failed SSH authentication attempts to identify the source IP, targeted account, authentication pattern, detection trigger, and observed response.
 
 ### MITRE ATT&CK
 - **Technique:** T1110.001 — Password Guessing
 - **Tactic:** Credential Access
 
 ### Hunt Hypothesis
-Repeated SSH authentication failures from the same source against the `dfir` account may trigger Wazuh rule `100101` and automated `firewall-drop` response.
+Repeated SSH authentication failures from the same source against the `dfir` account may indicate brute-force activity and trigger Wazuh rule `100101`.
 
 ### Detection Strategy
 - **Evidence Sources:** Wazuh SSH authentication logs, rule alerts, and Active Response logs.
-- **Suspicious Indicators:** Repeated failed authentication, rule `100101`, and `firewall-drop` execution.
-- **Queries:**
+- **Suspicious Indicators:** Repeated failed authentication from the same source, targeting the same account, followed by rule `100101`.
+- **Queries:** Actual SIEM/search queries used during the investigation.
 
-    ```Text
-    data.srcip: "192.168.56.1" AND data.dstuser: "dfir" AND decoder.name: "sshd"
+```text
+data.srcip: "192.168.56.1" AND data.dstuser: "dfir" AND decoder.name: "sshd"
 
-    data.srcip: "192.168.56.1" AND data.dstuser: "dfir" AND data.full_log: "Failed password"
+data.srcip: "192.168.56.1" AND data.dstuser: "dfir" AND data.full_log: "Failed password"
 
-    data.srcip: "192.168.56.1" AND data.dstuser: "dfir" AND rule.groups: "authentication_failed"
+data.srcip: "192.168.56.1" AND data.dstuser: "dfir" AND rule.groups: "authentication_failed"
 
-    rule.id: 100101
+rule.id: 100101
 
-    data.srcip: "192.168.56.1" AND rule.groups: "active_response"
-    ```
+data.srcip: "192.168.56.1" AND rule.groups: "active_response"
+```
 
 ### Investigation
-Wazuh identified repeated failed SSH authentication from `192.168.56.1` targeting dfir on ubuntu-s2.
+Wazuh identified repeated failed SSH authentication from `192.168.56.1` targeting the `dfir` account on `ubuntu-s2`.
 
-The failed-authentication search returned 37 events, spanning `August 27, 2026 @ 20:18:09.036 to August 30, 2026 @ 02:10:55.062`. The activity occurred in distinct bursts rather than one continuous attack.
+The failed-authentication search returned **37 events**, spanning **August 27, 2026 @ 20:18:09.036** to **August 30, 2026 @ 02:10:55.062**. The activity occurred in distinct bursts rather than one continuous attack.
 
-Rule `100101` generated 2 alerts, at August 30, 2026 @ 01:20:44.455 and August 30, 2026 @ 01:58:35.794.
+Wazuh rule `100101` generated **2 alerts**:
+- **August 30, 2026 @ 01:20:44.455**
+- **August 30, 2026 @ 01:58:35.794**
 
-The August 30, 2026 @ 01:58:35.794 alert recorded source 192.168.56.1, target dfir, and rule frequency 3, correlating three failed authentication attempts.
+The **August 30, 2026 @ 01:58:35.794** alert recorded source `192.168.56.1`, target `dfir`, and rule frequency `3`, correlating three failed authentication attempts.
 
-The Active Response search returned 1 event at August 30, 2026 @ 01:58:37.153, showing active-response/bin/firewall-drop executing an add command against 192.168.56.1.
+The Active Response search returned **1 event** at **August 30, 2026 @ 01:58:37.153**, showing `active-response/bin/firewall-drop` executing an `add` command against `192.168.56.1`.
 
-The embedded full_log timestamps display one hour earlier than the Wazuh @timestamp; the investigation timeline therefore uses the Wazuh @timestamp values.
+The embedded `full_log` timestamps display one hour earlier than the Wazuh `@timestamp` values; the investigation timeline therefore uses the Wazuh `@timestamp` values consistently.
 
 ### Findings & Summary
 The investigation confirmed repeated failed SSH authentication from `192.168.56.1` against the `dfir` account on `ubuntu-s2`.
 
-Wazuh recorded **37 failed-authentication events** in the searched dataset and generated **2 alerts for rule `100101`**. The alert at **August 30, 2026 @ 01:58:35.794** correlated three failed authentication attempts and was followed approximately 1.36 seconds later by an automated `firewall-drop` Active Response at **August 30, 2026 @ 01:58:37.153**.
+Wazuh recorded 37 failed-authentication events and generated 2 alerts for rule `100101`. The alert at **August 30, 2026 @ 01:58:35.794** correlated three failed authentication attempts and was followed approximately **1.36 seconds** later by an automated `firewall-drop` Active Response at **August 30, 2026 @ 01:58:37.153**.
 
-The evidence establishes the detection-to-mitigation sequence:
+The evidence establishes the following detection-to-response sequence:
 
 **Repeated failed SSH authentication → Wazuh rule `100101` → `firewall-drop` Active Response**
 
 ### Who, What, When, Where, Why, How
 - **Who:** The `dfir` account was targeted from source IP `192.168.56.1`.
-- **What:** Repeated failed SSH authentication triggered Wazuh rule `100101` and `firewall-drop` Active Response.
-- **When:** Detection occurred on **August 30, 2026 @ 01:58:35.794**, followed by Active Response at **August 30, 2026 @ 01:58:37.153**.
+- **What:** Repeated failed SSH authentication triggered Wazuh rule `100101` and an observed `firewall-drop` response.
+- **When:** Detection occurred on **August 30, 2026 @ 01:58:35.794**, followed by Active Response at **01:58:37.153**.
 - **Where:** The targeted system was `ubuntu-s2`.
 - **Why:** The reason for the authentication attempts is not established by the available telemetry.
-- **How:** Multiple failed SSH password attempts were correlated by rule `100101`, triggering the automated `firewall-drop` response.
+- **How:** Multiple failed SSH authentication attempts were correlated by rule `100101`, triggering the automated response.
 
 ### Recommendations
+- Review the source system associated with `192.168.56.1` to determine whether the authentication attempts were authorized.
 - Maintain monitoring for repeated SSH authentication failures and rule `100101` alerts.
-- Review the source system associated with `192.168.56.1` to determine whether the authentication attempts were authorized or malicious.
-- Continue using automated `firewall-drop` response for confirmed SSH brute-force activity.
-- Review SSH authentication telemetry and Active Response logs to maintain visibility into attack-to-mitigation timelines.
+- If the activity is confirmed unauthorized, review SSH access controls and authentication policies.
+- Continue reviewing SSH authentication and Active Response telemetry to maintain visibility into detection and response activity.
 
 ### Evidence
 
 ![SSH Brute-Force Active Response Firewall Drop](./Screenshot%204/SSH-Bruteforce-Active-Response-Firewall-Drop.png)
 
-The core evidence screenshot shows the Active Response execution at **August 30, 2026 @ 01:58:37.153**, including the source IP `192.168.56.1`, rule `651`, and `active-response/bin/firewall-drop`.
+The core evidence screenshot shows the Active Response execution at **August 30, 2026 @ 01:58:37.153**, including source IP `192.168.56.1`, rule `651`, and `active-response/bin/firewall-drop`.
 
 ## Operational Impact
-Confirmed automated detection and firewall-based mitigation of repeated SSH authentication failures, demonstrating an effective attack-to-response workflow.
+Confirmed the source, targeted account, authentication pattern, detection trigger and subsequent automated response, providing an auditable evidence trail for incident investigation.
